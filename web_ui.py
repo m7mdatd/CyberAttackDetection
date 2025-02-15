@@ -6,11 +6,11 @@ from requests.exceptions import ConnectionError
 import time
 import json
 
-# إعداد العنوان والواجهة
-st.set_page_config(page_title="نظام كشف الهجمات السيبرانية", layout="wide")
-st.title("🔍 نظام كشف الهجمات السيبرانية")
+# Address and interface setting
+st.set_page_config(page_title="Cyber ​​attack detection system", layout="wide")
+st.title("🔍 Cyber ​​attack detection system")
 
-# التحقق من حالة الخادم
+# Check server status
 def check_server():
     try:
         requests.get("http://127.0.0.1:8000/")
@@ -18,38 +18,38 @@ def check_server():
     except:
         return False
 
-# عرض تحذير إذا كان الخادم غير متصل
+# Display a warning if the server is offline
 if not check_server():
     st.error("""
-    ⚠️ لم يتم العثور على خادم التحليل. الرجاء اتباع الخطوات التالية:
-    1. افتح terminal جديد
-    2. انتقل إلى مجلد المشروع
-    3. قم بتشغيل الخادم باستخدام الأمر:
+    ⚠️ Analysis server not found. Please follow these steps:
+    1. Open a new terminal
+    2. Go to the project folder
+    3. Run the server with the command:
        ```
        python api.py
        ```
-    4. انتظر حتى يبدأ الخادم ثم أعد تحميل هذه الصفحة
+    4. Wait for the server to start and then reload this page
     """)
     st.stop()
 
-# تحميل الملف من المستخدم
-uploaded_file = st.file_uploader("📂 قم برفع ملف CSV لتحليله", type=["csv"])
+# Download the file from the user
+uploaded_file = st.file_uploader("📂 Upload a CSV file for analysis", type=["csv"])
 
 if uploaded_file is not None:
     try:
-        # إنشاء مجلد التحميلات إذا لم يكن موجوداً
+        # Create a Downloads folder if it does not exist
         os.makedirs("uploads", exist_ok=True)
 
-        # حفظ الملف المرفوع مؤقتاً
+        # Temporarily save the uploaded file
         file_path = os.path.join("uploads", uploaded_file.name)
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
 
-        st.success(f"✅ تم تحميل الملف بنجاح: {uploaded_file.name}")
+        st.success(f"✅ The file has been uploaded successfully: {uploaded_file.name}")
 
-        # التأكد من أن التحليل يتم مرة واحدة فقط
+        # Ensure that the analysis is performed only once
         if "threat_report" not in st.session_state:
-            with st.spinner("🔄 جاري تحليل البيانات... الرجاء الانتظار..."):
+            with st.spinner("🔄 Analyzing data... Please wait..."):
                 try:
                     with open(file_path, "rb") as file:
                         response = requests.post("http://127.0.0.1:8000/analyze", files={"file": file}, timeout=600)
@@ -57,76 +57,76 @@ if uploaded_file is not None:
                     if response.status_code == 200:
                         st.session_state["threat_report"] = response.json()
 
-                        # إعادة تدريب النموذج عند اكتشاف تهديدات جديدة
+                        # Retrain the model when new threats are detected
                         if st.session_state["threat_report"].get('potential_threats', 0) > 0:
                             retrain_response = requests.post("http://127.0.0.1:8000/retrain", json={"data": st.session_state["threat_report"]})
                             if retrain_response.status_code == 200:
-                                st.success("✅ تم تحديث النموذج بناءً على التهديدات المكتشفة!")
+                                st.success("✅ The model is updated based on detected threats!")
                             else:
-                                st.warning("⚠️ لم يتمكن النظام من إعادة التدريب بنجاح.")
+                                st.warning("⚠️ The system was unable to retrain successfully.")
                     else:
-                        st.error(f"❌ خطأ في الخادم: {response.status_code}")
+                        st.error(f"❌ Server error: {response.status_code}")
                 except ConnectionError:
                     st.error("""
-                    ❌ فشل الاتصال بالخادم. تأكد من:
-                    1. تشغيل خادم FastAPI (api.py)
-                    2. أن المنفذ 8000 متاح
-                    3. عدم وجود جدار حماية يمنع الاتصال
+                    ❌ Failed to connect to the server. Make sure:
+                    1. Run a server FastAPI (api.py)
+                    2.That port 8000 is available
+                    3. There is no firewall blocking the connection
                     """)
                 except Exception as e:
-                    st.error(f"❌ حدث خطأ غير متوقع: {str(e)}")
+                    st.error(f"❌ An unexpected error occurred: {str(e)}")
                 finally:
                     try:
                         if os.path.exists(file_path):
                             os.remove(file_path)
                     except Exception as e:
-                        st.warning(f"⚠️ تحذير: لم يتم حذف الملف المؤقت: {str(e)}")
+                        st.warning(f"⚠️ Warning: The temporary file has not been deleted: {str(e)}")
 
         if "threat_report" in st.session_state:
             threat_report = st.session_state["threat_report"]
 
-            st.subheader("📊 تقرير التهديدات المكتشفة")
+            st.subheader("📊 Report detected threats")
             col1, col2 = st.columns(2)
 
             with col1:
-                st.metric("📌 عدد العينات", threat_report.get('total_samples', 0))
-                st.metric("⚠️ التهديدات المحتملة", threat_report.get('potential_threats', 0))
+                st.metric("📌 Number of samples", threat_report.get('total_samples', 0))
+                st.metric("⚠️ Potential threats", threat_report.get('potential_threats', 0))
 
             with col2:
-                st.metric("🔥 التهديدات عالية الخطورة", threat_report.get('high_risk_threats', 0))
-                st.metric("📊 متوسط درجة التهديد", f"{threat_report.get('average_threat_score', 0):.2f}%")
+                st.metric("🔥High-risk threats", threat_report.get('high_risk_threats', 0))
+                st.metric("📊 Average threat score", f"{threat_report.get('average_threat_score', 0):.2f}%")
 
-            # عرض التفاصيل في جدول
+            # View details in a table
             if threat_report.get('threat_details'):
-                st.subheader("تفاصيل التهديدات")
+                st.subheader("Details of threats")
                 df = pd.DataFrame(threat_report['threat_details'])
                 st.dataframe(df)
             else:
-                st.success("✅ لا توجد تهديدات مكتشفة!")
+                st.success("✅ No threats detected!")
 
-            # زر تحميل التقرير دون إعادة تحميل البيانات
+            # Download report button without reloading the data
             json_report = json.dumps(threat_report, indent=2, ensure_ascii=False)
             st.download_button(
-                "📥 تحميل التقرير بصيغة JSON",
+                "📥 Download the report in JSON",
                 data=json_report,
                 file_name="threat_report.json",
                 mime="application/json"
             )
     except Exception as e:
-        st.error(f"❌ حدث خطأ أثناء معالجة الملف: {str(e)}")
+        st.error(f"❌ An error occurred while processing the file: {str(e)}")
 
-st.subheader("📜 السجلات السابقة")
+st.subheader("📜 Previous records")
 
-if st.button("📂 عرض السجلات المحفوظة"):
+if st.button("📂 View saved records"):
     response = requests.get("http://127.0.0.1:8000/logs")
 
     if response.status_code == 200:
         logs = response.json().get("logs", [])
         if logs:
-            df_logs = pd.DataFrame(logs, columns=["ID", "التوقيت", "عدد العينات", "التهديدات المحتملة",
-                                                  "التهديدات عالية الخطورة", "متوسط درجة التهديد"])
+            df_logs = pd.DataFrame(logs, columns=["ID", "Timing", "Number of samples", "Potential threats",
+                                                  "High-risk threats  ", "Average threat score  "])
             st.dataframe(df_logs)
         else:
-            st.info("ℹ️ لا توجد سجلات محفوظة.")
+            st.info("ℹ️ There are no records saved.")
     else:
-        st.error("❌ فشل في جلب السجلات.")
+        st.error("❌ Failed to fetch records.")
