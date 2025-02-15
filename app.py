@@ -1,4 +1,4 @@
-# إضافة جميع المكتبات المطلوبة
+# Importing all required libraries
 import os
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ from datetime import datetime
 from scipy import spatial
 import json
 
-# إعداد التسجيل
+# Logging Configuration
 warnings.filterwarnings('ignore')
 
 logging.basicConfig(
@@ -39,65 +39,65 @@ class DataPreprocessor:
     def __init__(self):
         self.label_encoder = LabelEncoder()
         self.scaler = StandardScaler()
-        self.pca = None  # سيتم تحديده لاحقًا بشكل ديناميكي
+        self.pca = None  # TBD dynamically
 
     def load_and_preprocess(self, file):
         try:
-            # تحميل البيانات
+            # Download data
             data = pd.read_csv(file, encoding="utf-8", low_memory=False)
-            logging.info("✅ تم تحميل البيانات بنجاح!")
+            logging.info("✅ Data uploaded successfully!")
 
-            logging.info(f"🔍 الأعمدة الموجودة في الملف: {list(data.columns)}")
-            logging.info(f"📊 أنواع البيانات في الملف:\n{data.dtypes}")
-            logging.info(f"🧐 عينة من البيانات:\n{data.head()}")
+            logging.info(f"🔍 Columns in the file: {list(data.columns)}")
+            logging.info(f"📊 Data types in the file:\n{data.dtypes}")
+            logging.info(f"🧐 Sample of data:\n{data.head()}")
 
-            # 🔹 البحث عن عمود التصنيفات تلقائيًا
+            # 🔹 Search for categories column automatically
             possible_labels = ["label", "attack_type", "Attack category", "Category"]
             label_column = next((col for col in possible_labels if col in data.columns), None)
 
             if not label_column:
-                raise ValueError("⚠️ لم يتم العثور على عمود التصنيفات (label) في البيانات.")
+                raise ValueError("⚠️ Categories column not found (label) In the data.")
 
             data.rename(columns={label_column: "label"}, inplace=True)
             data["label"] = self.label_encoder.fit_transform(data["label"])
-            logging.info(f"✅ تم تحديد عمود التصنيفات: {label_column}")
+            logging.info(f"✅ The Categories column is selected: {label_column}")
 
-            # 🔹 استخراج الميزات الرقمية فقط تلقائيًا
+            # 🔹 Automatically extract digital features only
             numeric_features = data.select_dtypes(include=[np.number]).columns.tolist()
 
             if "label" in numeric_features:
-                numeric_features.remove("label")  # 🔹 إزالة عمود التصنيف من الميزات
+                numeric_features.remove("label")  # 🔹 Remove rating column from features
 
             if not numeric_features:
-                raise ValueError("⚠️ لا توجد ميزات رقمية كافية في البيانات.")
+                raise ValueError("⚠️ There are not enough numerical features in the data.")
 
-            logging.info(f"🔹 الميزات المستخدمة: {numeric_features}")
+            logging.info(f"🔹 Features used: {numeric_features}")
 
-            # 🔹 معالجة القيم المفقودة قبل تطبيق PCA
+            # 🔹 Handle missing values ​​before applying PCA
             data[numeric_features] = data[numeric_features].fillna(data[numeric_features].median())
-            logging.info("✅ تم استبدال القيم المفقودة بالقيم المتوسطة لكل عمود رقمي.")
+            logging.info("✅ Missing values ​​were replaced with the mean values ​​for each numerical column.")
 
-            # 🔹 ضبط عدد المكونات ليكون مساويًا لأقل من عدد الميزات أو 95%
+            # 🔹 Set the number of components to be equal to the lesser of the number of features or 95%
             n_components = min(len(numeric_features), int(len(numeric_features) * 0.95))
             if n_components < 1:
-                raise ValueError("⚠️ عدد الميزات قليل جدًا، لا يمكن تطبيق PCA.")
+                raise ValueError("⚠️ The number of features is too few, it is not possible to apply PCA.")
 
             self.pca = PCA(n_components=n_components)
             X_numeric = data[numeric_features].values
             X_reduced = self.pca.fit_transform(X_numeric)
-            logging.info(f"✅ تم تقليل الأبعاد من {X_numeric.shape[1]} إلى {X_reduced.shape[1]}")
+            logging.info(f"✅ Dimensions have been reduced from {X_numeric.shape[1]} to {X_reduced.shape[1]}")
 
-            # 🔹 حذف الملف بعد المعالجة
+            # 🔹 Delete the file after processing
             try:
                 os.remove(file)
-                logging.info(f"🗑️ تم حذف الملف المؤقت: {file}")
+                logging.info(f"🗑️ The temporary file has been deleted: {file}")
             except Exception as e:
-                logging.warning(f"⚠️ لم يتم حذف الملف المؤقت: {str(e)}")
+                logging.warning(f"⚠️ The temporary file was not deleted: {str(e)}")
 
             return X_reduced, data["label"]
 
         except Exception as e:
-            logging.error(f"❌ خطأ في معالجة البيانات: {str(e)}")
+            logging.error(f"❌ Error processing data: {str(e)}")
             return None, None
 
 class ModelBuilder:
@@ -157,12 +157,12 @@ class ThreatPredictor:
         self.threshold = 0.8
 
     def train_anomaly_detector(self, X_train):
-        """تدريب كاشف الشذوذ على البيانات الطبيعية"""
+        """Training an anomaly detector on normal data"""
         self.anomaly_detector.fit(X_train)
         logging.info("✅ تم تدريب كاشف الشذوذ على %d عينة", len(X_train))
 
     def generate_threat_report(self, predictions, scores, timestamps):
-        """إنشاء تقرير عن التهديدات المكتشفة"""
+        """Create a report on detected threats"""
         report = {
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             'total_samples': len(predictions),
@@ -174,7 +174,7 @@ class ThreatPredictor:
         return report
 
     def detect_new_patterns(self, X_new):
-        """اكتشاف الأنماط الجديدة في البيانات"""
+        """Discover new patterns in data"""
         anomaly_scores = self.anomaly_detector.score_samples(X_new)
         anomalies = anomaly_scores < np.percentile(anomaly_scores, 10)
 
@@ -184,7 +184,7 @@ class ThreatPredictor:
         return None, None
 
     def update_pattern_memory(self, new_patterns, confidence_scores):
-        """تحديث ذاكرة الأنماط مع الأنماط الجديدة"""
+        """Refresh pattern memory with new patterns"""
         if new_patterns is not None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             for pattern, score in zip(new_patterns, confidence_scores):
@@ -198,7 +198,7 @@ class ThreatPredictor:
             logging.info("تم تحديث ذاكرة الأنماط مع %d نمط جديد", len(new_patterns))
 
     def predict_threats(self, X_current):
-        """التنبؤ بالتهديدات المحتملة بناءً على الأنماط المخزنة"""
+        """Predict potential threats based on stored patterns"""
         predictions = []
         threat_scores = []
 
@@ -215,7 +215,7 @@ class ThreatPredictor:
         return np.array(predictions), np.array(threat_scores)
 
     def _calculate_similarity(self, pattern1, pattern2):
-        """حساب درجة التشابه بين نمطين"""
+        """Calculating the degree of similarity between two patterns"""
         return 1 - spatial.distance.cosine(pattern1, pattern2)
 
 class EnhancedCyberSecuritySystem:
@@ -257,19 +257,19 @@ class EnhancedCyberSecuritySystem:
         X_train_reshaped = X_train.reshape(-1, X_train.shape[1], 1)
         X_test_reshaped = X_test.reshape(-1, X_test.shape[1], 1)
 
-        # تدريب كاشف التهديدات
+        # Threat detector training
         self.threat_predictor.train_anomaly_detector(X_train)
 
-        # البحث عن أنماط جديدة
+        # Find new styles
         new_patterns, confidence_scores = self.threat_predictor.detect_new_patterns(X_test)
         if new_patterns is not None:
             self.threat_predictor.update_pattern_memory(new_patterns, confidence_scores)
 
-        # التنبؤ بالتهديدات
+        # Threat prediction
         timestamps = pd.date_range(start='now', periods=len(X_test), freq='S')
         predictions, threat_scores = self.threat_predictor.predict_threats(X_test)
 
-        # إنشاء تقرير التهديدات
+        # Create a threat report
         threat_report = self.threat_predictor.generate_threat_report(
             predictions, threat_scores, timestamps
         )
@@ -291,7 +291,7 @@ class EnhancedCyberSecuritySystem:
 
         for name, model in self.models.items():
             try:
-                logging.info(f"تدريب نموذج {name}")
+                logging.info(f"Model training {name}")
 
                 if name in ['svm', 'random_forest']:
                     grid_search = GridSearchCV(
@@ -307,7 +307,7 @@ class EnhancedCyberSecuritySystem:
                     joblib.dump(model, f'models/{name}_model.pkl')
                     y_pred = model.predict(X_test)
 
-                else:  # النماذج العصبية
+                else:  # Neural models
                     model.fit(
                         X_train_reshaped,
                         y_train,
@@ -323,7 +323,7 @@ class EnhancedCyberSecuritySystem:
                 results[name] = self._calculate_metrics(y_test, y_pred)
 
             except Exception as e:
-                logging.error(f"خطأ في تدريب نموذج {name}: {str(e)}")
+                logging.error(f"Error training model {name}: {str(e)}")
                 continue
 
         self._display_results(results)
@@ -331,21 +331,21 @@ class EnhancedCyberSecuritySystem:
 
     def _calculate_metrics(self, y_true, y_pred):
         return {
-            'دقة': round(accuracy_score(y_true, y_pred) * 100, 2),
-            'استرجاع': round(recall_score(y_true, y_pred, average='macro') * 100, 2),
-            'دقة موجبة': round(precision_score(y_true, y_pred, average='macro') * 100, 2),
-            'معدل F1': round(f1_score(y_true, y_pred, average='macro') * 100, 2)
+            'accuracy': round(accuracy_score(y_true, y_pred) * 100, 2),
+            'recovery': round(recall_score(y_true, y_pred, average='macro') * 100, 2),
+            'Positive precision': round(precision_score(y_true, y_pred, average='macro') * 100, 2),
+            'an average F1': round(f1_score(y_true, y_pred, average='macro') * 100, 2)
         }
 
     def _display_results(self, results):
         df_results = pd.DataFrame.from_dict(results, orient='index')
-        logging.info("\n=== تقرير تقييم النماذج ===\n%s", df_results.to_string())
+        logging.info("\n=== Model evaluation report ===\n%s", df_results.to_string())
 
         plt.figure(figsize=(12, 6))
         df_results.plot(kind='bar')
-        plt.title('مقارنة أداء النماذج')
-        plt.xlabel('النماذج')
-        plt.ylabel('النسبة المئوية')
+        plt.title('Compare models performance')
+        plt.xlabel('Models')
+        plt.ylabel('Percentage')
         plt.legend(loc='lower right')
         plt.grid(axis='y')
         plt.xticks(rotation=45)
@@ -354,7 +354,7 @@ class EnhancedCyberSecuritySystem:
         plt.close()
 
         best_model = df_results.sort_values(by=['معدل F1'], ascending=False).index[0]
-        logging.info(f"أفضل نموذج بناءً على معدل F1: {best_model}")
+        logging.info(f"Best model based on rate F1: {best_model}")
 
 
 def main():
@@ -377,12 +377,12 @@ def main():
         system.initialize_models(num_classes, X.shape[1])
         results, threat_report = system.train_and_evaluate(X_train, X_test, y_train, y_test)
 
-        # حفظ تقرير التهديدات
+        # Save threat report
         with open('threat_report.json', 'w', encoding='utf-8') as f:
             json.dump(threat_report, f, ensure_ascii=False, indent=2)
 
     except Exception as e:
-        logging.error(f"خطأ في تشغيل النظام: {str(e)}")
+        logging.error(f"System operation error: {str(e)}")
         raise
 
 
