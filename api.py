@@ -11,11 +11,11 @@ from app import DataPreprocessor, EnhancedCyberSecuritySystem
 
 app = FastAPI()
 
-# التأكد من وجود مجلد لحفظ الملفات المرفوعة
+# Make sure there is a folder to save the uploaded files
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# إنشاء قاعدة بيانات SQLite لتخزين السجلات السابقة
+# Create a SQLite database to store historical records
 DB_PATH = "cybersecurity_logs.db"
 conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
@@ -37,29 +37,29 @@ async def analyze(file: UploadFile = File(...)):
     try:
         file_location = os.path.join(UPLOAD_DIR, file.filename)
 
-        # فتح الملف مؤقتًا وكتابته، ثم إغلاقه لضمان عدم حجزه
+        # Temporarily open the file, write it, then close it to ensure it is not reserved
         with open(file_location, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # معالجة البيانات
+        # Data processing
         preprocessor = DataPreprocessor()
         X, y = preprocessor.load_and_preprocess(file_location)
 
         if X is None or y is None:
-            return {"error": "❌ فشل في معالجة الملف. تأكد من صحة البيانات."}
+            return {"error": "❌ Failed to process the file. Make sure the data is correct."}
 
-        # تشغيل نموذج الكشف عن الهجمات
+        # Run an attack detection model
         system = EnhancedCyberSecuritySystem()
         num_classes = len(set(y))
         system.initialize_models(num_classes, X.shape[1])
 
-        # استخدام نفس البيانات للتدريب والاختبار في هذه الحالة
+        # Use the same data for training and testing in this case
         results, threat_report = system.train_and_evaluate(X, X, y, y)
 
         if threat_report is None:
             return {"error": "❌ فشل في إنشاء تقرير التهديدات."}
 
-        # تخزين النتائج في قاعدة البيانات
+        # Store the results in the database
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
@@ -75,23 +75,23 @@ async def analyze(file: UploadFile = File(...)):
         conn.commit()
         conn.close()
 
-        # التأكد من إغلاق الملف قبل حذفه
+        # Make sure to close the file before deleting it
         try:
             os.remove(file_location)
-            logging.info(f"🗑️ تم حذف الملف المؤقت: {file_location}")
+            logging.info(f"🗑️ The temporary file has been deleted: {file_location}")
         except Exception as e:
-            logging.warning(f"⚠️ لم يتم حذف الملف المؤقت: {str(e)}")
+            logging.warning(f"⚠️ The temporary file was not deleted: {str(e)}")
 
         return threat_report
 
     except Exception as e:
-        logging.error(f"❌ خطأ في تحليل الملف: {str(e)}")
-        return {"error": f"❌ حدث خطأ: {str(e)}"}
+        logging.error(f"❌ Error parsing file: {str(e)}")
+        return {"error": f"❌ An error occurred: {str(e)}"}
 
 @app.post("/retrain")
 async def retrain(data: dict):
     try:
-        logging.info("🔄 بدء إعادة تدريب النموذج بناءً على التهديدات المكتشفة...")
+        logging.info("🔄 Start retraining the model based on the detected threats...")
         preprocessor = DataPreprocessor()
         system = EnhancedCyberSecuritySystem()
 
@@ -102,19 +102,19 @@ async def retrain(data: dict):
                 system.initialize_models(len(set(data.get("potential_threats", []))), X_new.shape[1])
                 system.train_and_evaluate(X_new, X_new, data.get("potential_threats", []),
                                           data.get("potential_threats", []))
-                logging.info("✅ تم إعادة تدريب النموذج بنجاح!")
+                logging.info("✅The model has been successfully retrained!")
                 return JSONResponse(content=json.loads(
-                    json.dumps({"message": "✅ تم تحديث النموذج بناءً على التهديدات المكتشفة."}, ensure_ascii=False)),
+                    json.dumps({"message": "✅ The model is updated based on detected threats."}, ensure_ascii=False)),
                                     media_type="application/json; charset=utf-8")
 
         return JSONResponse(content=json.loads(
-            json.dumps({"message": "⚠️ لم يتم العثور على بيانات كافية لإعادة التدريب."}, ensure_ascii=False)),
+            json.dumps({"message": "⚠️Not enough data was found for retraining."}, ensure_ascii=False)),
                             media_type="application/json; charset=utf-8")
 
     except Exception as e:
-        logging.error(f"❌ خطأ أثناء إعادة التدريب: {str(e)}")
+        logging.error(f"❌ Error during retraining: {str(e)}")
         return JSONResponse(
-            content=json.loads(json.dumps({"error": f"❌ حدث خطأ أثناء إعادة التدريب: {str(e)}"}, ensure_ascii=False)),
+            content=json.loads(json.dumps({"error": f"❌ An error occurred during retraining: {str(e)}"}, ensure_ascii=False)),
             media_type="application/json; charset=utf-8")
 
 @app.get("/logs")
@@ -127,8 +127,8 @@ def get_logs():
         conn.close()
         return {"logs": logs}
     except Exception as e:
-        logging.error(f"❌ خطأ أثناء جلب السجلات: {str(e)}")
-        return {"error": f"❌ حدث خطأ أثناء جلب السجلات: {str(e)}"}
+        logging.error(f"❌ Error while fetching records: {str(e)}")
+        return {"error": f"❌ An error occurred while fetching records: {str(e)}"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)
