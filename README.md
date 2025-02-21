@@ -1,6 +1,6 @@
 # CyberAttackDetection
 
-path/to/image.jpg
+path/to/image.png
 
 ## Overview
 This project implements an advanced cybersecurity attack detection system using artificial intelligence and machine learning techniques. The system utilizes multiple AI models including Support Vector Machines (SVM), Decision Trees, Convolutional Neural Networks (CNN), and Recurrent Neural Networks (RNN) to detect and classify potential cyber threats.
