@@ -17,7 +17,6 @@ import joblib
 import os
 from datetime import datetime
 import warnings
-import tensorflow as tf
 from imblearn.over_sampling import SMOTE  # مكتبة موازنة البيانات
 from tensorflow.keras.layers import BatchNormalization
 
@@ -174,18 +173,29 @@ def load_and_preprocess_data(file):
             st.error("الملف فارغ! يرجى تحميل ملف يحتوي على بيانات.")
             return None
 
-        # عرض معلومات أولية عن البيانات
+        # معالجة القيم غير المحدودة والشاذة
+        numeric_columns = data.select_dtypes(include=['float64', 'int64']).columns
+        for col in numeric_columns:
+            # التعامل مع القيم اللانهائية
+            data[col] = data[col].replace([np.inf, -np.inf], np.nan)
 
+            # استبدال القيم غير المعقولة بالقيمة المتوسطة
+            col_mean = data[col].mean()
+            col_std = data[col].std()
 
-        # معالجة القيم المفقودة
-        for column in data.columns:
-            if data[column].isnull().any():
-                if data[column].dtype in ['int64', 'float64']:
-                    data[column].fillna(data[column].mean(), inplace=True)
-                else:
-                    data[column].fillna(data[column].mode()[0], inplace=True)
+            # تحديد الحدود باستخدام قاعدة 3 انحرافات معيارية
+            lower_bound = col_mean - 3 * col_std
+            upper_bound = col_mean + 3 * col_std
 
-        # تحويل البيانات غير الرقمية
+            # قص القيم خارج النطاق
+            data[col] = np.clip(data[col], lower_bound, upper_bound)
+
+            # معالجة القيم المفقودة
+            data[col].fillna(col_mean, inplace=True)
+
+        # المعالجات الأخرى كما هي في الكود الأصلي...
+
+        # معالجة البيانات غير الرقمية
         for column in data.columns:
             if data[column].dtype == 'object':
                 le = LabelEncoder()
@@ -232,7 +242,6 @@ def load_and_preprocess_data(file):
     except Exception as e:
         st.error(f"حدث خطأ أثناء معالجة الملف: {str(e)}")
         return None
-
 
 def prepare_data(data):
     """تجهيز البيانات للتدريب مع تصنيف متوازن باستخدام SMOTE"""
@@ -387,36 +396,11 @@ def evaluate_model(y_true, y_pred, model_name):
     }
 
 
-import tensorflow as tf  # التأكد من استيراد TensorFlow
-import pandas as pd
-import numpy as np
-import streamlit as st
-from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, confusion_matrix
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Conv1D, MaxPooling1D, Flatten, LSTM, Dropout, BatchNormalization
 from tensorflow.keras.callbacks import EarlyStopping
-
-# ✅ **دالة مستقلة لتقييم النماذج**
-def evaluate_model(y_true, y_pred, model_name):
-    """حساب مقاييس الأداء للنموذج"""
-    acc = accuracy_score(y_true, y_pred) * 100
-    rec = recall_score(y_true, y_pred, average='binary') * 100
-    prec = precision_score(y_true, y_pred, average='binary') * 100
-    f1 = f1_score(y_true, y_pred, average='binary') * 100
-
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-    false_positive_rate = (fp / (fp + tn)) * 100 if (fp + tn) > 0 else 0
-
-    return {
-        "النموذج": model_name,
-        "الدقة (%)": round(acc, 2),
-        "الحساسية (%)": round(rec, 2),
-        "الدقة التنبؤية (%)": round(prec, 2),
-        "F1-Score (%)": round(f1, 2),
-        "معدل الإيجابيات الزائفة (%)": round(false_positive_rate, 2),
-    }
 
 # ✅ **تحديث `train_models`**
 def train_models(X_train, X_test, y_train, y_test):
